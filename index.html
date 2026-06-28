@@ -324,10 +324,12 @@
 
     <!-- LEARN -->
     <div class="screen" id="learn-screen">
+      <button class="btn" style="margin-bottom:14px;background:var(--accent2);color:#0f1f0f;width:100%;opacity:.9" onclick="startBee()">🐝 Fleißige Biene — 15 zufällige Pflanzen</button>
       <div id="learn-empty" style="display:none">
         <div class="big">🎉</div>
         <h2>Alle erledigt!</h2>
         <p>Keine fälligen Wiederholungen. Komm morgen wieder.</p>
+        <button class="btn" style="margin-top:16px;background:var(--accent2);color:#0f1f0f;width:100%" onclick="startBee()">🐝 Fleißige Biene — 15 zufällige Pflanzen</button>
       </div>
       <div id="learn-card" style="display:none">
         <div id="learn-progress"></div>
@@ -371,7 +373,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.8 — Claude Vision</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.9 — Claude Vision</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -408,6 +410,13 @@
 
       <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
 
+      <h2 style="margin-bottom:6px">🧹 Duplikate entfernen</h2>
+      <p class="settings-note">Erkennt doppelte Einträge anhand von Name und Foto und löscht die Kopien.</p>
+      <button class="btn btn-secondary" onclick="removeDuplicates()">Duplikate suchen & löschen</button>
+      <div id="dedup-status" style="font-size:.85rem;color:var(--muted);margin-top:8px;min-height:20px"></div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
       <h2 style="margin-bottom:6px">📦 Daten sichern</h2>
       <p class="settings-note">Exportiere alle Pflanzen als Datei – z. B. zum Umzug auf ein neues Gerät oder nach Netlify.</p>
 
@@ -429,8 +438,11 @@
   <div id="modal-box">
     <img id="modal-img" src="" alt="">
     <div id="modal-title"></div>
+    <div id="modal-location" style="display:none;font-size:.82rem;color:var(--muted);margin:6px 0"></div>
     <div id="modal-notes"></div>
-    <div class="modal-actions">
+    <div id="modal-info-content" style="display:none;margin-top:12px;font-size:.9rem"></div>
+    <button class="btn btn-secondary" id="modal-info-btn" style="margin-top:12px;width:100%" onclick="loadModalInfo()">ℹ️ Bestimmung & Fun Facts</button>
+    <div class="modal-actions" style="margin-top:10px">
       <button class="btn btn-secondary" onclick="openEdit(currentDetailId)">Bearbeiten</button>
       <button class="btn btn-danger" onclick="deletePlant(currentDetailId)">Löschen</button>
     </div>
@@ -759,11 +771,68 @@ async function openDetail(id) {
   document.getElementById('modal-img').style.display = p.photo ? 'block' : 'none';
   document.getElementById('modal-title').textContent = p.name;
   document.getElementById('modal-notes').textContent = p.notes || '—';
+  // GPS
+  const locEl = document.getElementById('modal-location');
+  if (p.gps?.lat) {
+    const url = `https://www.google.com/maps?q=${p.gps.lat},${p.gps.lon}`;
+    const lbl = p.gps.label || `${p.gps.lat}, ${p.gps.lon}`;
+    locEl.innerHTML = `📍 <a href="${url}" target="_blank" style="color:var(--accent);text-decoration:none">${lbl}</a>`;
+    locEl.style.display = 'block';
+  } else { locEl.style.display = 'none'; }
+  // Reset info
+  document.getElementById('modal-info-content').style.display = 'none';
+  document.getElementById('modal-info-content').innerHTML = '';
+  document.getElementById('modal-info-btn').style.display = 'block';
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal(e) {
   if (!e || e.target === document.getElementById('modal-overlay'))
     document.getElementById('modal-overlay').classList.remove('open');
+}
+
+async function loadModalInfo() {
+  const p = await dbGet(currentDetailId); if (!p) return;
+  const btn = document.getElementById('modal-info-btn');
+  const box = document.getElementById('modal-info-content');
+  btn.style.display = 'none';
+  box.style.display = 'block';
+  // Aus Cache
+  if (p.infoHtml) { box.innerHTML = p.infoHtml; return; }
+  box.innerHTML = '<div style="color:var(--muted);padding:12px 0">🔍 Lade Informationen …</div>';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getApiKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6', max_tokens: 1024,
+        messages: [{ role: 'user', content: `Gib mir Informationen zur Pflanze "${p.name}" auf Deutsch.
+
+**Bestimmungsmerkmale:**
+Beschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.
+
+**Fun Facts:**
+3-4 kurze Fun Facts auf Deutsch. Schreibe: modern, lebendig, seriös und historisch korrekt. Keine trockenen Kunstgeschichte-Vorlesungen, sondern überraschende Details die im Gedächtnis bleiben. Kurz und prägnant.
+
+Kein Markdown außer den zwei Überschriften mit **.` }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message);
+    const text = data.content[0].text;
+    const html = text.replace(/\*\*(.+?)\*\*/g, '<h3>$1</h3>')
+      .split('\n').filter(l => l.trim()).map(l => l.startsWith('<h3>') ? l : '<p>' + l + '</p>').join('');
+    box.innerHTML = html;
+    // In DB cachen
+    p.infoHtml = html; await dbPut(p);
+  } catch(err) {
+    box.innerHTML = `<p style="color:var(--danger)">Fehler: ${err.message}</p>`;
+    btn.style.display = 'block';
+  }
 }
 async function deletePlant(id) {
   if (!confirm('Diese Pflanze wirklich löschen?')) return;
@@ -979,6 +1048,54 @@ async function gradeCard(knew) {
   await dbPut(full);
   learnIndex++;
   updateDueBadge();
+  showLearnCard();
+}
+
+
+// ── Duplikate entfernen ───────────────────────────────────────
+async function removeDuplicates() {
+  const status = document.getElementById('dedup-status');
+  status.style.color = 'var(--muted)';
+  status.textContent = 'Suche Duplikate …';
+  const all = await dbGetAll();
+  const seen = new Map();
+  const toDelete = [];
+  for (const p of all) {
+    // Key: Name (lowercase) + erste 100 Zeichen des Fotos
+    const key = (p.name || '').toLowerCase().trim() + '|' + (p.photo || '').slice(0, 100);
+    if (seen.has(key)) {
+      toDelete.push(p.id);
+    } else {
+      seen.set(key, p.id);
+    }
+  }
+  if (!toDelete.length) {
+    status.style.color = 'var(--accent)';
+    status.textContent = '✓ Keine Duplikate gefunden.';
+    return;
+  }
+  if (!confirm(`${toDelete.length} Duplikat(e) gefunden. Jetzt löschen?`)) {
+    status.textContent = 'Abgebrochen.';
+    return;
+  }
+  for (const id of toDelete) await dbDelete(id);
+  status.style.color = 'var(--accent)';
+  status.textContent = `✓ ${toDelete.length} Duplikat(e) gelöscht.`;
+  updateDueBadge();
+  renderArchive();
+}
+
+
+// ── Fleißige Biene: 15 zufällige Pflanzen ────────────────────
+async function startBee() {
+  const all = await dbGetAll();
+  if (all.length === 0) { alert('Noch keine Pflanzen vorhanden.'); return; }
+  // Shuffle
+  const shuffled = all.sort(() => Math.random() - 0.5);
+  learnQueue = shuffled.slice(0, 15);
+  learnIndex = 0;
+  document.getElementById('learn-empty').style.display = 'none';
+  document.getElementById('learn-card').style.display = 'flex';
   showLearnCard();
 }
 
