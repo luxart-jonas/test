@@ -297,7 +297,6 @@
         <a id="lens-link" href="https://lens.google.com" target="_blank" style="display:none;margin-top:8px;font-size:.8rem;color:var(--muted);text-decoration:none;">🔍 Mit Google Lens prüfen ↗</a>
       </div>
       <div id="gps-hint" style="font-size:.78rem;color:var(--muted);margin-bottom:6px;min-height:18px"></div>
-      <button class="btn btn-ai" id="btn-ai-recognize" style="margin-bottom:14px;display:none" onclick="recognizePlant()">🌿 Pflanze automatisch erkennen</button>
 
       <div class="form-group">
         <label>Pflanzenname</label>
@@ -372,7 +371,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.7 — Claude Vision</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.8 — Claude Vision</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -565,12 +564,13 @@ document.getElementById('photo-input').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
   addPhotoData = await resizeImage(file, 1200, 1200, 0.82);
   setPhotoArea('photo-area', addPhotoData);
-  document.getElementById('btn-ai-recognize').style.display = getApiKey() ? 'block' : 'none';
+
   const ll = document.getElementById('lens-link'); if(ll) ll.style.display = 'none';
   document.getElementById('ai-result').style.display = 'none';
   e.target.value = '';
-  // GPS automatisch ermitteln
+  // GPS + Erkennung automatisch
   getGPSAuto();
+  if (getApiKey()) recognizePlant();
 });
 
 document.getElementById('edit-photo-input').addEventListener('change', async e => {
@@ -594,11 +594,9 @@ async function recognizePlant() {
   if (!key) { alert('Bitte zuerst einen Anthropic API-Key in den Einstellungen eintragen.'); return; }
   if (!addPhotoData) { alert('Bitte zuerst ein Foto aufnehmen.'); return; }
 
-  const btn = document.getElementById('btn-ai-recognize');
   const spinner = document.getElementById('ai-spinner');
   const resultBox = document.getElementById('ai-result');
 
-  btn.disabled = true;
   spinner.style.display = 'block';
   resultBox.style.display = 'none';
 
@@ -651,7 +649,6 @@ async function recognizePlant() {
     alert('Fehler bei der Pflanzenerkennung:\n' + err.message);
   } finally {
     spinner.style.display = 'none';
-    btn.disabled = false;
   }
 }
 
@@ -721,7 +718,7 @@ async function savePlant() {
   addPhotoData = null; addGpsData = null; lastAiName = '';
   document.getElementById('photo-area').innerHTML =
     '<span class="big-icon">📷</span><span>Tippen um Foto aufzunehmen</span><div class="overlay">Ändern</div>';
-  document.getElementById('btn-ai-recognize').style.display = 'none';
+
   document.getElementById('ai-result').style.display = 'none';
   document.getElementById('gps-hint').textContent = '';
   const msg = document.getElementById('add-msg');
