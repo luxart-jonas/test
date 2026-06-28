@@ -373,7 +373,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.9 — Claude Vision</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.10 — Claude Vision</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -782,8 +782,9 @@ async function openDetail(id) {
   // Reset info
   document.getElementById('modal-info-content').style.display = 'none';
   document.getElementById('modal-info-content').innerHTML = '';
-  document.getElementById('modal-info-btn').style.display = 'block';
+  document.getElementById('modal-info-btn').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
+  loadModalInfo();
 }
 function closeModal(e) {
   if (!e || e.target === document.getElementById('modal-overlay'))
