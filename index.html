@@ -418,7 +418,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.16 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.17 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -1376,6 +1376,9 @@ function applyZoomTransform() {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeZoom(); });
 
+// Zoom Touch/Click Events — nach DOM-Laden
+document.addEventListener('DOMContentLoaded', () => {
+
 // Overlay: Tap auf Hintergrund schließt
 document.getElementById('zoom-overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('zoom-overlay') || e.target.id === 'zoom-img-wrap') closeZoom();
@@ -1432,6 +1435,8 @@ document.getElementById('zoom-img-wrap').addEventListener('wheel', e => {
   zoomScale = Math.min(Math.max(zoomScale * delta, 0.5), 8);
   applyZoomTransform();
 }, { passive: false });
+
+}); // end DOMContentLoaded
 
 // ── Due Badge ─────────────────────────────────────────────────
 async function updateDueBadge() {
