@@ -404,13 +404,13 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.13 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.14 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
         <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">Lädt Bestimmungsmerkmale und Fun Facts für alle Pflanzen ohne Info. Danach sofort abrufbar.</p>
         <button class="btn btn-primary" onclick="loadAllInfos(false)" id="btn-load-all">Alle Infos laden</button>
-        <button class="btn btn-secondary" onclick="loadAllInfos(true)" style="margin-top:8px;">🔄 Alle Infos neu generieren</button>
+        <button class="btn btn-secondary" onclick="confirmRegenAll()" style="margin-top:8px;">🔄 Alle Infos neu generieren</button>
         <div id="load-all-status" style="margin-top:10px;font-size:.85rem;color:var(--muted);"></div>
       </div>
       <p class="settings-note">
@@ -768,8 +768,8 @@ async function getGPSAuto() {
         const geo = await r.json();
         const a = geo.address || {};
         const parts = [
+          a.suburb || a.village || a.town || a.city || a.municipality || null,
           a.road ? (a.road + (a.house_number ? ' ' + a.house_number : '')) : null,
-          a.suburb || a.village || a.town || a.city || a.municipality,
           a.nature_reserve || a.leisure || null
         ].filter(Boolean);
         const label = parts.length ? parts.join(', ') : geo.display_name?.split(',').slice(0,2).join(',').trim();
@@ -1404,44 +1404,91 @@ openDB().then(() => {
   updateKeyStatus();
   updatePlantNetKeyStatus();
 }).catch(err => alert('IndexedDB Fehler: ' + err));
+function confirmRegenAll() {
+  if (!confirm('⚠️ Alle Infos neu generieren?\n\nDies überschreibt alle bereits generierten Bestimmungsmerkmale und Fun Facts für alle Pflanzen in deiner Sammlung. Dieser Vorgang kann mehrere Minuten dauern und kann nicht rückgängig gemacht werden.')) return;
+  if (!confirm('Wirklich alle Infos neu generieren? Alle vorherigen Texte gehen verloren!')) return;
+  loadAllInfos(true);
+}
+
 async function loadAllInfos(forceReload=false) {
   const key = getApiKey();
-  if (!key) { alert('Bitte zuerst API Key eintragen!'); return; }
+  if (!key) { alert('Bitte zuerst Anthropic API Key eintragen!'); return; }
+  const plantnetKey = getPlantNetKey();
 
   const btn = document.getElementById('btn-load-all');
   const status = document.getElementById('load-all-status');
   btn.disabled = true;
 
   const all = await dbGetAll();
-  const without = all.filter(p => (forceReload || !p.infoHtml) && p.name);
+  const toProcess = all.filter(p => (forceReload || !p.infoHtml) && p.name);
 
-  if (!without.length) {
-    status.textContent = forceReload ? '✓ Keine Pflanzen gefunden.' : '✓ Alle Pflanzen haben bereits Infos!';
+  if (!toProcess.length) {
+    status.textContent = '✓ Alle Pflanzen haben bereits Infos!';
     btn.disabled = false;
     return;
   }
 
-  status.textContent = `0 / ${without.length} geladen …`;
+  status.textContent = `0 / ${toProcess.length} geladen …`;
 
-  for (let i = 0; i < without.length; i++) {
-    const p = without[i];
-    status.textContent = `${i+1} / ${without.length}: ${p.name} …`;
+  for (let i = 0; i < toProcess.length; i++) {
+    const p = toProcess[i];
+    status.textContent = `${i+1} / ${toProcess.length}: ${p.name} …`;
 
     try {
+      // ── Lateinischen Namen via PlantNet holen falls fehlend ──
+      if (!p.latin && plantnetKey) {
+        try {
+          const searchRes = await fetch(`https://ormpszktwwiahjooukjk.supabase.co/functions/v1/plantnet-proxy?api-key=${encodeURIComponent(plantnetKey)}&nb-results=1&lang=de&q=${encodeURIComponent(p.name)}`, { method: 'GET' });
+          // PlantNet hat keine Textsuche — wir überspringen falls kein Foto
+        } catch {}
+        // Fallback: Claude nach lateinischem Namen fragen
+        try {
+          const latinRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-6', max_tokens: 50,
+              messages: [{ role: 'user', content: `Was ist der lateinische Name der Pflanze "${p.name}"? Antworte NUR mit dem lateinischen Namen, sonst nichts.` }]
+            })
+          });
+          const latinData = await latinRes.json();
+          if (latinRes.ok) {
+            const latin = latinData.content[0].text.trim().replace(/[^a-zA-Z ]/g, '').trim();
+            if (latin) {
+              const full = await dbGet(p.id);
+              if (full && !full.latin) { full.latin = latin; await dbPut(full); p.latin = latin; }
+            }
+          }
+        } catch {}
+      }
+
+      // ── Illustration via Wikimedia holen ──
+      if (p.latin) {
+        try {
+          const cat = p.latin + ' - botanical illustrations';
+          const wikiRes = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(cat)}&cmtype=file&cmlimit=1&format=json&origin=*`);
+          const wikiData = await wikiRes.json();
+          const members = wikiData?.query?.categorymembers || [];
+          if (members.length) {
+            const imgRes = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(members[0].title)}&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`);
+            const imgData = await imgRes.json();
+            const pages = imgData?.query?.pages || {};
+            const thumbUrl = Object.values(pages)[0]?.imageinfo?.[0]?.thumburl;
+            if (thumbUrl) {
+              const full = await dbGet(p.id);
+              if (full && !full.illustrationUrl) { full.illustrationCacheUrl = thumbUrl; await dbPut(full); }
+            }
+          }
+        } catch {}
+      }
+
+      // ── Fun Facts + Bestimmungsmerkmale via Claude ──
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1024,
-          messages: [{
-            role: 'user',
-            content: `Gib mir Informationen zur Pflanze "${p.name}"${p.latin ? ` (${p.latin})` : ''} auf Deutsch.
+          model: 'claude-sonnet-4-6', max_tokens: 1024,
+          messages: [{ role: 'user', content: `Gib mir Informationen zur Pflanze "${p.name}"${p.latin ? \` (\${p.latin})\` : ''} auf Deutsch.
 
 **Bestimmungsmerkmale:**
 Beschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.
@@ -1449,27 +1496,23 @@ Beschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsfo
 **Fun Facts:**
 3 überraschende Fakten – historisch, kulinarisch, medizinisch oder ökologisch. Fließtext, ca. 3-4 Sätze.
 
-Kein Markdown außer den zwei Überschriften mit **.`
-          }]
+Kein Markdown außer den zwei Überschriften mit **.` }]
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message);
       const text = data.content[0].text;
-      const html = text
-        .replace(/\*\*(.+?)\*\*/g, '<h3>$1</h3>')
-        .split('\n').filter(l => l.trim()).map(l => l.startsWith('<h3>') ? l : '<p>' + l + '</p>').join('');
+      const html = text.replace(/\*\*(.+?)\*\*/g, '<h3>$1</h3>').split('\n').filter(l => l.trim()).map(l => l.startsWith('<h3>') ? l : '<p>' + l + '</p>').join('');
       const full = await dbGet(p.id);
       if (full) { full.infoHtml = html; await dbPut(full); infoCache[p.id] = html; }
     } catch(err) {
       console.warn('Fehler bei', p.name, err.message);
     }
 
-    // Kurze Pause zwischen Anfragen
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600));
   }
 
-  status.textContent = `✓ Fertig! ${without.length} Pflanzen aktualisiert.`;
+  status.textContent = `✓ Fertig! ${toProcess.length} Pflanzen aktualisiert.`;
   btn.disabled = false;
 }
 
