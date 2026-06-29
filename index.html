@@ -206,12 +206,23 @@
 
   /* ── Zoom Overlay ── */
   #zoom-overlay {
-    display:none; position:fixed; inset:0; background:rgba(0,0,0,.92);
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.95);
     z-index:9999; align-items:center; justify-content:center; cursor:zoom-out;
+    animation: fadeIn .15s ease;
   }
   #zoom-overlay.open { display:flex; }
-  #zoom-overlay img { max-width:95vw; max-height:95vh; object-fit:contain; border-radius:8px; touch-action:pinch-zoom; }
-  #zoom-overlay .close-btn { position:absolute; top:16px; right:20px; background:none; border:none; color:#fff; font-size:2rem; cursor:pointer; line-height:1; }
+  #zoom-overlay img {
+    max-width:95vw; max-height:92vh; object-fit:contain; border-radius:4px;
+    touch-action:pinch-zoom; cursor:default; box-shadow:0 4px 40px rgba(0,0,0,.6);
+  }
+  #zoom-overlay .close-btn {
+    position:absolute; top:12px; right:16px; background:rgba(0,0,0,.5);
+    border:1px solid rgba(255,255,255,.2); color:#fff; font-size:1.4rem;
+    cursor:pointer; line-height:1; padding:4px 10px; border-radius:6px;
+  }
+  #zoom-overlay .close-btn:hover { background:rgba(255,255,255,.15); }
+  .zoom-hint { position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+    font-size:.75rem; color:rgba(255,255,255,.4); pointer-events:none; white-space:nowrap; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   #learn-progress { font-size: .82rem; color: var(--muted); text-align: center; letter-spacing: .05em; }
   #learn-img-wrap { width: 100%; aspect-ratio: 4/3; border-radius: var(--radius); overflow: hidden; background: var(--surface); position: relative; touch-action: none; }
@@ -404,7 +415,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.14 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.15 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -1269,7 +1280,14 @@ function showIllusImage(context, url, label) {
   const boxEl  = document.getElementById(context + '-illus-box');
   const srcEl  = document.getElementById(context + '-illus-source');
   wrapEl.style.display = 'block';
-  boxEl.innerHTML = `<img src="${url}" alt="Botanische Illustration" onclick="openZoom('${url}')" onerror="this.parentElement.innerHTML='<div class=illus-loading>Bild konnte nicht geladen werden</div>'">`;
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = 'Botanische Illustration';
+  img.style.cursor = 'zoom-in';
+  img.onclick = () => openZoom(url);
+  img.onerror = () => { boxEl.innerHTML = '<div class="illus-loading">Bild konnte nicht geladen werden</div>'; };
+  boxEl.innerHTML = '';
+  boxEl.appendChild(img);
   if (label && !srcEl.innerHTML) srcEl.textContent = label;
 }
 
@@ -1330,11 +1348,15 @@ async function illusDelete(context) {
 function openZoom(url) {
   document.getElementById('zoom-img').src = url;
   document.getElementById('zoom-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
 }
 function closeZoom() {
   document.getElementById('zoom-overlay').classList.remove('open');
   document.getElementById('zoom-img').src = '';
+  document.body.style.overflow = '';
 }
+// ESC zum Schließen
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeZoom(); });
 
 // ── Due Badge ─────────────────────────────────────────────────
 async function updateDueBadge() {
@@ -1504,8 +1526,9 @@ if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().t
 </script>
 <!-- Zoom Overlay -->
 <div id="zoom-overlay" onclick="closeZoom()">
-  <button class="close-btn" onclick="closeZoom()">✕</button>
-  <img id="zoom-img" src="" alt="">
+  <button class="close-btn" onclick="event.stopPropagation();closeZoom()">✕</button>
+  <img id="zoom-img" src="" alt="" onclick="event.stopPropagation()">
+  <div class="zoom-hint">Tippen zum Schließen · ESC</div>
 </div>
 <!-- Hidden file input for illustration upload -->
 <input type="file" id="illus-upload-input" accept="image/*" style="display:none" onchange="handleIllusUpload(this)">
