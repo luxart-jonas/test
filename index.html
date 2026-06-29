@@ -513,6 +513,10 @@
       <input type="text" id="edit-name" autocomplete="off">
     </div>
     <div class="form-group">
+      <label>Lateinischer Name</label>
+      <input type="text" id="edit-latin" autocomplete="off" placeholder="z.B. Valeriana officinalis">
+    </div>
+    <div class="form-group">
       <label>Sonstiges</label>
       <textarea id="edit-notes"></textarea>
     </div>
@@ -579,7 +583,7 @@ function updateKeyStatus() {
 let addPhotoData = null, editPhotoData = null, editId = null, addGpsData = null;
 let currentDetailId = null;
 let learnQueue = [], learnIndex = 0;
-let lastAiName = '';
+let lastAiName = '', lastAiLatin = '';
 
 // ── Tab Switching ────────────────────────────────────────────
 function switchTab(tab) {
@@ -647,8 +651,8 @@ function setPhotoArea(areaId, src) {
 
 // ── PlantNet Plant Recognition ────────────────────────────────
 async function recognizePlant() {
-  const key = getApiKey();
-  if (!key) { alert('Bitte zuerst einen Anthropic API-Key in den Einstellungen eintragen.'); return; }
+  const plantnetKey = getPlantNetKey();
+  if (!plantnetKey) { alert('Bitte zuerst einen PlantNet API-Key in den Einstellungen eintragen.'); return; }
   if (!addPhotoData) { alert('Bitte zuerst ein Foto aufnehmen.'); return; }
 
   const spinner = document.getElementById('ai-spinner');
@@ -658,7 +662,7 @@ async function recognizePlant() {
   resultBox.style.display = 'none';
 
   try {
-    // Claude Vision Pflanzenerkennung
+    // PlantNet Pflanzenerkennung
     const base64 = addPhotoData.split(',')[1];
     const mimeType = addPhotoData.split(';')[0].split(':')[1] || 'image/jpeg';
 
@@ -694,6 +698,7 @@ async function recognizePlant() {
     const latinName = result.latin || '';
 
     lastAiName = germanName;
+    lastAiLatin = latinName;
     // Namen direkt eintragen
     autoApplyAiName(germanName);
     document.getElementById('ai-name-text').textContent =
@@ -762,6 +767,7 @@ async function savePlant() {
   if (!name) { alert('Bitte einen Pflanzennamen eingeben.'); return; }
   await dbPut({
     name,
+    latin: lastAiLatin || '',
     notes: document.getElementById('add-notes').value.trim(),
     photo: addPhotoData,
     gps: addGpsData,
@@ -772,7 +778,7 @@ async function savePlant() {
   // Reset
   document.getElementById('add-name').value = '';
   document.getElementById('add-notes').value = '';
-  addPhotoData = null; addGpsData = null; lastAiName = '';
+  addPhotoData = null; addGpsData = null; lastAiName = ''; lastAiLatin = '';
   document.getElementById('photo-area').innerHTML =
     '<span class="big-icon">📷</span><span>Tippen um Foto aufzunehmen</span><div class="overlay">Ändern</div>';
 
@@ -897,6 +903,7 @@ async function openEdit(id) {
   const p = await dbGet(id); if (!p) return;
   editId = id; editPhotoData = p.photo || null;
   document.getElementById('edit-name').value = p.name;
+  document.getElementById('edit-latin').value = p.latin || '';
   document.getElementById('edit-notes').value = p.notes || '';
   const area = document.getElementById('edit-photo-area');
   if (p.photo) {
@@ -916,6 +923,7 @@ async function saveEdit() {
   if (!name) { alert('Bitte einen Pflanzennamen eingeben.'); return; }
   const p = await dbGet(editId);
   p.name = name;
+  p.latin = document.getElementById('edit-latin').value.trim();
   p.notes = document.getElementById('edit-notes').value.trim();
   if (editPhotoData) p.photo = editPhotoData;
   await dbPut(p);
