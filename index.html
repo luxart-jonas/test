@@ -404,7 +404,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.12 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.13 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -438,6 +438,21 @@
       </div>
 
       <button class="btn btn-danger" style="margin-top:12px" onclick="deleteApiKey()">API-Key löschen</button>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
+      <h2 style="margin-bottom:6px">🌿 PlantNet API-Key</h2>
+      <p class="settings-note" style="margin-bottom:12px">
+        Für die Pflanzenerkennung via PlantNet (500 Anfragen/Tag kostenlos).<br>
+        Key unter <span style="color:var(--accent)">my.plantnet.org</span> registrieren.
+      </p>
+      <label>PlantNet API-Key</label>
+      <div class="api-key-row">
+        <input type="password" id="plantnet-key-input" placeholder="2b10…" autocomplete="off" spellcheck="false">
+        <button class="btn btn-primary btn-sm" onclick="savePlantNetKey()">Speichern</button>
+      </div>
+      <div id="plantnet-key-status" class="key-none">Kein PlantNet API-Key gespeichert</div>
+      <button class="btn btn-danger" style="margin-top:12px" onclick="deletePlantNetKey()">PlantNet Key löschen</button>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
 
@@ -555,18 +570,45 @@ function computeNextReview(level) { return Date.now() + INTERVALS[Math.min(level
 
 // ── API Key (localStorage) ───────────────────────────────────
 function getApiKey() { return localStorage.getItem('ant_key') || ''; }
+function getPlantNetKey() { return localStorage.getItem('plantnet_key') || ''; }
+function savePlantNetKey() {
+  const val = document.getElementById('plantnet-key-input').value.trim();
+  if (!val) { alert('Bitte einen PlantNet API-Key eingeben.'); return; }
+  localStorage.setItem('plantnet_key', val);
+  document.getElementById('plantnet-key-input').value = '';
+  updatePlantNetKeyStatus();
+  alert('PlantNet API-Key gespeichert!');
+}
+function deletePlantNetKey() {
+  if (!confirm('PlantNet API-Key wirklich löschen?')) return;
+  localStorage.removeItem('plantnet_key');
+  updatePlantNetKeyStatus();
+}
+function updatePlantNetKeyStatus() {
+  const el = document.getElementById('plantnet-key-status');
+  if (!el) return;
+  if (getPlantNetKey()) {
+    el.textContent = '✓ PlantNet API-Key gespeichert';
+    el.className = 'key-ok';
+  } else {
+    el.textContent = 'Kein PlantNet API-Key gespeichert';
+    el.className = 'key-none';
+  }
+}
 function saveApiKey() {
   const val = document.getElementById('api-key-input').value.trim();
   if (!val) { alert('Bitte einen API-Key eingeben.'); return; }
   localStorage.setItem('ant_key', val);
   document.getElementById('api-key-input').value = '';
   updateKeyStatus();
+  updatePlantNetKeyStatus();
   alert('Anthropic API-Key gespeichert!');
 }
 function deleteApiKey() {
   if (!confirm('API-Key wirklich löschen?')) return;
   localStorage.removeItem('ant_key');
   updateKeyStatus();
+  updatePlantNetKeyStatus();
 }
 function updateKeyStatus() {
   const el = document.getElementById('key-status');
@@ -595,6 +637,7 @@ function switchTab(tab) {
   if (tab === 'archive') renderArchive();
   if (tab === 'learn')   initLearn();
   if (tab === 'settings') updateKeyStatus();
+  updatePlantNetKeyStatus();
 }
 
 // ── Image Resize ─────────────────────────────────────────────
@@ -1359,6 +1402,7 @@ document.addEventListener('DOMContentLoaded', () => {
 openDB().then(() => {
   updateDueBadge();
   updateKeyStatus();
+  updatePlantNetKeyStatus();
 }).catch(err => alert('IndexedDB Fehler: ' + err));
 async function loadAllInfos(forceReload=false) {
   const key = getApiKey();
