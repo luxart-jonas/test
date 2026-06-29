@@ -194,6 +194,24 @@
   #learn-empty .big { font-size: 3rem; margin-bottom: 12px; }
   #learn-empty h2 { font-family: var(--ff-head); font-size: 1.4rem; color: var(--accent2); margin-bottom: 8px; }
   #learn-card { display: flex; flex-direction: column; gap: 16px; animation: fadeIn .3s ease; }
+
+  /* ── Botanische Illustration ── */
+  .illus-wrap { position:relative; background:var(--surface2); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+  .illus-wrap img { width:100%; max-height:320px; object-fit:contain; cursor:zoom-in; display:block; background:#f5f0e8; }
+  .illus-controls { display:flex; gap:6px; padding:8px; background:var(--surface); border-top:1px solid var(--border); flex-wrap:wrap; }
+  .illus-btn { background:var(--surface2); border:1px solid var(--border); color:var(--muted); padding:5px 10px; border-radius:6px; font-size:.75rem; cursor:pointer; flex:1; min-width:0; text-align:center; }
+  .illus-btn:hover { color:var(--text); border-color:var(--accent); }
+  .illus-loading { padding:20px; text-align:center; color:var(--muted); font-size:.82rem; }
+  .illus-source { font-size:.68rem; color:var(--muted); padding:4px 8px 6px; text-align:right; }
+
+  /* ── Zoom Overlay ── */
+  #zoom-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.92);
+    z-index:9999; align-items:center; justify-content:center; cursor:zoom-out;
+  }
+  #zoom-overlay.open { display:flex; }
+  #zoom-overlay img { max-width:95vw; max-height:95vh; object-fit:contain; border-radius:8px; touch-action:pinch-zoom; }
+  #zoom-overlay .close-btn { position:absolute; top:16px; right:20px; background:none; border:none; color:#fff; font-size:2rem; cursor:pointer; line-height:1; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   #learn-progress { font-size: .82rem; color: var(--muted); text-align: center; letter-spacing: .05em; }
   #learn-img-wrap { width: 100%; aspect-ratio: 4/3; border-radius: var(--radius); overflow: hidden; background: var(--surface); position: relative; touch-action: none; }
@@ -365,6 +383,19 @@
         <h2 id="info-modal-name"></h2>
         <p class="latin" id="info-modal-latin"></p>
         <div id="info-modal-location" style="display:none;font-size:.85rem;color:var(--muted);margin-bottom:14px"></div>
+        <!-- Botanische Illustration im Lern-Modal -->
+        <div id="info-illus-wrap" style="margin-bottom:16px;display:none">
+          <div class="illus-wrap" id="info-illus-box">
+            <div class="illus-loading">🔍 Lade Illustration …</div>
+          </div>
+          <div class="illus-controls">
+            <button class="illus-btn" onclick="illusPrev('info')">← Vorherige</button>
+            <button class="illus-btn" onclick="illusNext('info')">Nächste →</button>
+            <button class="illus-btn" onclick="illusUpload('info')">📤 Eigenes</button>
+            <button class="illus-btn" onclick="illusDelete('info')" style="color:#e88">🗑 Löschen</button>
+          </div>
+          <div class="illus-source" id="info-illus-source"></div>
+        </div>
         <div id="info-modal-content"><div id="info-loading">🔍 Lade Informationen …</div></div>
         <button class="btn btn-secondary" onclick="closeInfoModal()" style="margin-top:20px;width:100%">← Zurück</button>
       </div>
@@ -373,7 +404,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.11 — Claude Vision</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.12 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -410,21 +441,6 @@
 
       <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
 
-      <h2 style="margin-bottom:6px">🌿 PlantNet API-Key</h2>
-      <p class="settings-note" style="margin-bottom:12px">
-        Für die Pflanzenerkennung via PlantNet (spezialisierte Pflanzen-KI, 500 Anfragen/Tag kostenlos).<br>
-        Key unter <span style="color:var(--accent)">my.plantnet.org</span> registrieren.
-      </p>
-      <label>PlantNet API-Key</label>
-      <div class="api-key-row">
-        <input type="password" id="plantnet-key-input" placeholder="2b10…" autocomplete="off" autocorrect="off" spellcheck="false">
-        <button class="btn btn-primary btn-sm" onclick="savePlantNetKey()">Speichern</button>
-      </div>
-      <div id="plantnet-key-status" class="key-none">Kein PlantNet API-Key gespeichert</div>
-      <button class="btn btn-danger" style="margin-top:12px" onclick="deletePlantNetKey()">PlantNet Key löschen</button>
-
-      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
-
       <h2 style="margin-bottom:6px">🧹 Duplikate entfernen</h2>
       <p class="settings-note">Erkennt doppelte Einträge anhand von Name und Foto und löscht die Kopien.</p>
       <button class="btn btn-secondary" onclick="removeDuplicates()">Duplikate suchen & löschen</button>
@@ -455,6 +471,20 @@
     <div id="modal-title"></div>
     <div id="modal-location" style="display:none;font-size:.82rem;color:var(--muted);margin:6px 0"></div>
     <div id="modal-notes"></div>
+    <!-- Botanische Illustration -->
+    <div id="modal-illus-wrap" style="margin-top:14px;display:none">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Botanische Illustration</div>
+      <div class="illus-wrap" id="modal-illus-box">
+        <div class="illus-loading">🔍 Lade Illustration …</div>
+      </div>
+      <div class="illus-controls">
+        <button class="illus-btn" onclick="illusPrev('modal')">← Vorherige</button>
+        <button class="illus-btn" onclick="illusNext('modal')">Nächste →</button>
+        <button class="illus-btn" onclick="illusUpload('modal')">📤 Eigenes</button>
+        <button class="illus-btn" onclick="illusDelete('modal')" style="color:#e88">🗑 Löschen</button>
+      </div>
+      <div class="illus-source" id="modal-illus-source"></div>
+    </div>
     <div id="modal-info-content" style="display:none;margin-top:12px;font-size:.9rem"></div>
     <button class="btn btn-secondary" id="modal-info-btn" style="margin-top:12px;width:100%" onclick="loadModalInfo()">ℹ️ Bestimmung & Fun Facts</button>
     <div class="modal-actions" style="margin-top:10px">
@@ -521,45 +551,18 @@ function computeNextReview(level) { return Date.now() + INTERVALS[Math.min(level
 
 // ── API Key (localStorage) ───────────────────────────────────
 function getApiKey() { return localStorage.getItem('ant_key') || ''; }
-function getPlantNetKey() { return localStorage.getItem('plantnet_key') || ''; }
-function savePlantNetKey() {
-  const val = document.getElementById('plantnet-key-input').value.trim();
-  if (!val) { alert('Bitte einen PlantNet API-Key eingeben.'); return; }
-  localStorage.setItem('plantnet_key', val);
-  document.getElementById('plantnet-key-input').value = '';
-  updatePlantNetKeyStatus();
-  alert('PlantNet API-Key gespeichert!');
-}
-function deletePlantNetKey() {
-  if (!confirm('PlantNet API-Key wirklich löschen?')) return;
-  localStorage.removeItem('plantnet_key');
-  updatePlantNetKeyStatus();
-}
-function updatePlantNetKeyStatus() {
-  const el = document.getElementById('plantnet-key-status');
-  if (!el) return;
-  if (getPlantNetKey()) {
-    el.textContent = '✓ PlantNet API-Key gespeichert';
-    el.className = 'key-ok';
-  } else {
-    el.textContent = 'Kein PlantNet API-Key gespeichert';
-    el.className = 'key-none';
-  }
-}
 function saveApiKey() {
   const val = document.getElementById('api-key-input').value.trim();
   if (!val) { alert('Bitte einen API-Key eingeben.'); return; }
   localStorage.setItem('ant_key', val);
   document.getElementById('api-key-input').value = '';
   updateKeyStatus();
-  updatePlantNetKeyStatus();
   alert('Anthropic API-Key gespeichert!');
 }
 function deleteApiKey() {
   if (!confirm('API-Key wirklich löschen?')) return;
   localStorage.removeItem('ant_key');
   updateKeyStatus();
-  updatePlantNetKeyStatus();
 }
 function updateKeyStatus() {
   const el = document.getElementById('key-status');
@@ -588,7 +591,6 @@ function switchTab(tab) {
   if (tab === 'archive') renderArchive();
   if (tab === 'learn')   initLearn();
   if (tab === 'settings') updateKeyStatus();
-  updatePlantNetKeyStatus();
 }
 
 // ── Image Resize ─────────────────────────────────────────────
@@ -645,45 +647,58 @@ function setPhotoArea(areaId, src) {
 
 // ── PlantNet Plant Recognition ────────────────────────────────
 async function recognizePlant() {
-  const plantnetKey = getPlantNetKey();
-  if (!plantnetKey) { alert('Bitte zuerst einen PlantNet API-Key in den Einstellungen eintragen.'); return; }
+  const key = getApiKey();
+  if (!key) { alert('Bitte zuerst einen Anthropic API-Key in den Einstellungen eintragen.'); return; }
   if (!addPhotoData) { alert('Bitte zuerst ein Foto aufnehmen.'); return; }
 
   const spinner = document.getElementById('ai-spinner');
   const resultBox = document.getElementById('ai-result');
+
   spinner.style.display = 'block';
   resultBox.style.display = 'none';
 
   try {
-    // Base64 → Blob
-    const mime = addPhotoData.split(';')[0].split(':')[1] || 'image/jpeg';
-    const blob = await fetch(addPhotoData).then(r => r.blob());
+    // Claude Vision Pflanzenerkennung
+    const base64 = addPhotoData.split(',')[1];
+    const mimeType = addPhotoData.split(';')[0].split(':')[1] || 'image/jpeg';
 
-    const fd = new FormData();
-    fd.append('images', blob, 'plant.jpg');
-
-    const PROXY = 'https://ormpszktwwiahjooukjk.supabase.co/functions/v1/plantnet-proxy';
-    const url = `${PROXY}?api-key=${encodeURIComponent(plantnetKey)}&nb-results=3&lang=de`;
-
-    const response = await fetch(url, { method: 'POST', body: fd });
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+            { type: 'text', text: 'Erkenne die Pflanze auf diesem Foto. Antworte NUR mit diesem JSON ohne Markdown: {"name":"Deutscher Name","latin":"Lateinischer Name","info":"Ein kurzer Satz"}' }
+          ]
+        }]
+      })
+    });
     const data = await response.json();
 
-    if (!response.ok) throw new Error(data.message || 'PlantNet Fehler ' + response.status);
+    if (!response.ok) throw new Error(data.error?.message || 'API-Fehler ' + response.status);
 
-    const results = data.results || [];
-    if (!results.length) throw new Error('Keine Pflanze erkannt. Versuche ein deutlicheres Foto.');
+    let result;
+    try { result = JSON.parse(data.content[0].text); }
+    catch { throw new Error('Keine Pflanze erkannt. Versuche ein deutlicheres Foto.'); }
 
-    const best = results[0];
-    const germanName = best.species?.commonNames?.[0] || best.species?.scientificNameWithoutAuthor || 'Unbekannt';
-    const latinName = best.species?.scientificNameWithoutAuthor || '';
-    const pct = Math.round((best.score || 0) * 100);
-    const info = `PlantNet: ${pct}% Übereinstimmung` + (best.species?.family?.scientificNameWithoutAuthor ? ` · Familie: ${best.species.family.scientificNameWithoutAuthor}` : '');
+    const germanName = result.name || 'Unbekannt';
+    const latinName = result.latin || '';
 
     lastAiName = germanName;
+    // Namen direkt eintragen
     autoApplyAiName(germanName);
     document.getElementById('ai-name-text').textContent =
       germanName + (latinName && latinName !== germanName ? ` (${latinName})` : '');
-    document.getElementById('ai-info-text').textContent = info;
+    document.getElementById('ai-info-text').textContent = result.info || '';
     resultBox.style.display = 'block';
     document.getElementById('lens-link').style.display = 'inline-block';
 
@@ -815,6 +830,10 @@ async function openDetail(id) {
   document.getElementById('modal-info-btn').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
   loadModalInfo();
+  // Botanische Illustration laden
+  document.getElementById('modal-illus-wrap').style.display = 'none';
+  document.getElementById('modal-illus-source').innerHTML = '';
+  loadIllustration('modal', p.latin || '', id);
 }
 function closeModal(e) {
   if (!e || e.target === document.getElementById('modal-overlay'))
@@ -979,6 +998,11 @@ async function showInfoModal() {
   document.getElementById('info-modal-name').textContent = p.name || '';
   document.getElementById('info-modal-latin').textContent = p.latin || '';
 
+  // Illustration
+  document.getElementById('info-illus-wrap').style.display = 'none';
+  document.getElementById('info-illus-source').innerHTML = '';
+  loadIllustration('info', p.latin || '', p.id);
+
   // GPS/Ort anzeigen
   const fullP = await dbGet(p.id);
   const locEl = document.getElementById('info-modal-location');
@@ -1130,6 +1154,161 @@ async function startBee() {
   showLearnCard();
 }
 
+
+// ── Botanische Illustration Engine ────────────────────────────
+const illusState = {
+  modal: { latin:'', files:[], index:0, customUrl:null, plantId:null },
+  info:  { latin:'', files:[], index:0, customUrl:null, plantId:null },
+};
+
+async function loadIllustration(context, latin, plantId) {
+  const state = illusState[context];
+  state.latin = latin;
+  state.plantId = plantId;
+  state.index = 0;
+
+  const wrapEl = document.getElementById(context + '-illus-wrap');
+  const boxEl  = document.getElementById(context + '-illus-box');
+  const srcEl  = document.getElementById(context + '-illus-source');
+
+  if (!latin) { wrapEl.style.display = 'none'; return; }
+
+  // Eigenes Bild aus DB?
+  const p = await dbGet(plantId);
+  if (p?.illustrationUrl) {
+    state.customUrl = p.illustrationUrl;
+    showIllusImage(context, p.illustrationUrl, 'Eigenes Bild');
+    return;
+  }
+  state.customUrl = null;
+
+  wrapEl.style.display = 'block';
+  boxEl.innerHTML = '<div class="illus-loading">🔍 Suche Illustration …</div>';
+  srcEl.textContent = '';
+
+  try {
+    const cat = latin + ' - botanical illustrations';
+    const apiUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers&cmtitle=Category:${encodeURIComponent(cat)}&cmtype=file&cmlimit=10&format=json&origin=*`;
+    const res = await fetch(apiUrl);
+    const data = await res.json();
+    state.files = (data?.query?.categorymembers || []).map(m => m.title);
+
+    if (!state.files.length) {
+      boxEl.innerHTML = '<div class="illus-loading" style="color:var(--muted)">Keine historische Illustration verfügbar</div>';
+      return;
+    }
+
+    await showIllusIndex(context, 0);
+  } catch(err) {
+    boxEl.innerHTML = '<div class="illus-loading" style="color:#e88">Fehler beim Laden</div>';
+  }
+}
+
+async function showIllusIndex(context, idx) {
+  const state = illusState[context];
+  if (!state.files.length) return;
+  idx = ((idx % state.files.length) + state.files.length) % state.files.length;
+  state.index = idx;
+
+  const boxEl = document.getElementById(context + '-illus-box');
+  const srcEl = document.getElementById(context + '-illus-source');
+  boxEl.innerHTML = '<div class="illus-loading">⏳ Lade Bild …</div>';
+
+  const fileName = state.files[idx];
+  const imgApi = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent(fileName)}&prop=imageinfo&iiprop=url&iiurlwidth=600&format=json&origin=*`;
+  const r = await fetch(imgApi);
+  const d = await r.json();
+  const pages = d?.query?.pages || {};
+  const page = Object.values(pages)[0];
+  const thumbUrl = page?.imageinfo?.[0]?.thumburl;
+  const descUrl  = page?.imageinfo?.[0]?.descriptionurl || '#';
+
+  if (thumbUrl) {
+    showIllusImage(context, thumbUrl, `Wikimedia Commons (${idx+1}/${state.files.length})`);
+    srcEl.innerHTML = `<a href="${descUrl}" target="_blank" style="color:var(--accent)">Quelle ansehen ↗</a>`;
+    // Cachen in DB
+    const p = await dbGet(state.plantId);
+    if (p && !p.illustrationUrl) {
+      p.illustrationCacheUrl = thumbUrl;
+      await dbPut(p);
+    }
+  } else {
+    boxEl.innerHTML = '<div class="illus-loading">Bild nicht verfügbar</div>';
+  }
+}
+
+function showIllusImage(context, url, label) {
+  const wrapEl = document.getElementById(context + '-illus-wrap');
+  const boxEl  = document.getElementById(context + '-illus-box');
+  const srcEl  = document.getElementById(context + '-illus-source');
+  wrapEl.style.display = 'block';
+  boxEl.innerHTML = `<img src="${url}" alt="Botanische Illustration" onclick="openZoom('${url}')" onerror="this.parentElement.innerHTML='<div class=illus-loading>Bild konnte nicht geladen werden</div>'">`;
+  if (label && !srcEl.innerHTML) srcEl.textContent = label;
+}
+
+async function illusNext(context) {
+  const state = illusState[context];
+  if (state.customUrl) return;
+  await showIllusIndex(context, state.index + 1);
+}
+async function illusPrev(context) {
+  const state = illusState[context];
+  if (state.customUrl) return;
+  await showIllusIndex(context, state.index - 1);
+}
+
+function illusUpload(context) {
+  illusState[context]._uploadContext = context;
+  const inp = document.getElementById('illus-upload-input');
+  inp.dataset.context = context;
+  inp.click();
+}
+
+async function handleIllusUpload(input) {
+  const context = input.dataset.context;
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const url = e.target.result;
+    const state = illusState[context];
+    state.customUrl = url;
+    // In DB speichern
+    const p = await dbGet(state.plantId);
+    if (p) { p.illustrationUrl = url; await dbPut(p); }
+    showIllusImage(context, url, 'Eigenes Bild');
+    document.getElementById(context + '-illus-source').textContent = 'Eigenes Bild';
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+async function illusDelete(context) {
+  if (!confirm('Illustration entfernen?')) return;
+  const state = illusState[context];
+  state.customUrl = null;
+  const p = await dbGet(state.plantId);
+  if (p) { delete p.illustrationUrl; delete p.illustrationCacheUrl; await dbPut(p); }
+  const srcEl = document.getElementById(context + '-illus-source');
+  srcEl.innerHTML = '';
+  // Neu laden
+  if (state.files.length) {
+    state.index = 0;
+    await showIllusIndex(context, 0);
+  } else {
+    document.getElementById(context + '-illus-box').innerHTML = '<div class="illus-loading">Keine Illustration vorhanden</div>';
+  }
+}
+
+// ── Zoom ──────────────────────────────────────────────────────
+function openZoom(url) {
+  document.getElementById('zoom-img').src = url;
+  document.getElementById('zoom-overlay').classList.add('open');
+}
+function closeZoom() {
+  document.getElementById('zoom-overlay').classList.remove('open');
+  document.getElementById('zoom-img').src = '';
+}
+
 // ── Due Badge ─────────────────────────────────────────────────
 async function updateDueBadge() {
   const all = await dbGetAll();
@@ -1188,7 +1367,6 @@ document.addEventListener('DOMContentLoaded', () => {
 openDB().then(() => {
   updateDueBadge();
   updateKeyStatus();
-  updatePlantNetKeyStatus();
 }).catch(err => alert('IndexedDB Fehler: ' + err));
 async function loadAllInfos(forceReload=false) {
   const key = getApiKey();
@@ -1261,5 +1439,12 @@ Kein Markdown außer den zwei Überschriften mit **.`
 
 if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(r => r.forEach(s => s.unregister())); }
 </script>
+<!-- Zoom Overlay -->
+<div id="zoom-overlay" onclick="closeZoom()">
+  <button class="close-btn" onclick="closeZoom()">✕</button>
+  <img id="zoom-img" src="" alt="">
+</div>
+<!-- Hidden file input for illustration upload -->
+<input type="file" id="illus-upload-input" accept="image/*" style="display:none" onchange="handleIllusUpload(this)">
 </body>
 </html>
