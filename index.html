@@ -373,7 +373,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.10 — Claude Vision</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.11 — Claude Vision</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -407,6 +407,21 @@
       </div>
 
       <button class="btn btn-danger" style="margin-top:12px" onclick="deleteApiKey()">API-Key löschen</button>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
+      <h2 style="margin-bottom:6px">🌿 PlantNet API-Key</h2>
+      <p class="settings-note" style="margin-bottom:12px">
+        Für die Pflanzenerkennung via PlantNet (spezialisierte Pflanzen-KI, 500 Anfragen/Tag kostenlos).<br>
+        Key unter <span style="color:var(--accent)">my.plantnet.org</span> registrieren.
+      </p>
+      <label>PlantNet API-Key</label>
+      <div class="api-key-row">
+        <input type="password" id="plantnet-key-input" placeholder="2b10…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="btn btn-primary btn-sm" onclick="savePlantNetKey()">Speichern</button>
+      </div>
+      <div id="plantnet-key-status" class="key-none">Kein PlantNet API-Key gespeichert</div>
+      <button class="btn btn-danger" style="margin-top:12px" onclick="deletePlantNetKey()">PlantNet Key löschen</button>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
 
@@ -506,18 +521,45 @@ function computeNextReview(level) { return Date.now() + INTERVALS[Math.min(level
 
 // ── API Key (localStorage) ───────────────────────────────────
 function getApiKey() { return localStorage.getItem('ant_key') || ''; }
+function getPlantNetKey() { return localStorage.getItem('plantnet_key') || ''; }
+function savePlantNetKey() {
+  const val = document.getElementById('plantnet-key-input').value.trim();
+  if (!val) { alert('Bitte einen PlantNet API-Key eingeben.'); return; }
+  localStorage.setItem('plantnet_key', val);
+  document.getElementById('plantnet-key-input').value = '';
+  updatePlantNetKeyStatus();
+  alert('PlantNet API-Key gespeichert!');
+}
+function deletePlantNetKey() {
+  if (!confirm('PlantNet API-Key wirklich löschen?')) return;
+  localStorage.removeItem('plantnet_key');
+  updatePlantNetKeyStatus();
+}
+function updatePlantNetKeyStatus() {
+  const el = document.getElementById('plantnet-key-status');
+  if (!el) return;
+  if (getPlantNetKey()) {
+    el.textContent = '✓ PlantNet API-Key gespeichert';
+    el.className = 'key-ok';
+  } else {
+    el.textContent = 'Kein PlantNet API-Key gespeichert';
+    el.className = 'key-none';
+  }
+}
 function saveApiKey() {
   const val = document.getElementById('api-key-input').value.trim();
   if (!val) { alert('Bitte einen API-Key eingeben.'); return; }
   localStorage.setItem('ant_key', val);
   document.getElementById('api-key-input').value = '';
   updateKeyStatus();
+  updatePlantNetKeyStatus();
   alert('Anthropic API-Key gespeichert!');
 }
 function deleteApiKey() {
   if (!confirm('API-Key wirklich löschen?')) return;
   localStorage.removeItem('ant_key');
   updateKeyStatus();
+  updatePlantNetKeyStatus();
 }
 function updateKeyStatus() {
   const el = document.getElementById('key-status');
@@ -546,6 +588,7 @@ function switchTab(tab) {
   if (tab === 'archive') renderArchive();
   if (tab === 'learn')   initLearn();
   if (tab === 'settings') updateKeyStatus();
+  updatePlantNetKeyStatus();
 }
 
 // ── Image Resize ─────────────────────────────────────────────
@@ -602,58 +645,45 @@ function setPhotoArea(areaId, src) {
 
 // ── PlantNet Plant Recognition ────────────────────────────────
 async function recognizePlant() {
-  const key = getApiKey();
-  if (!key) { alert('Bitte zuerst einen Anthropic API-Key in den Einstellungen eintragen.'); return; }
+  const plantnetKey = getPlantNetKey();
+  if (!plantnetKey) { alert('Bitte zuerst einen PlantNet API-Key in den Einstellungen eintragen.'); return; }
   if (!addPhotoData) { alert('Bitte zuerst ein Foto aufnehmen.'); return; }
 
   const spinner = document.getElementById('ai-spinner');
   const resultBox = document.getElementById('ai-result');
-
   spinner.style.display = 'block';
   resultBox.style.display = 'none';
 
   try {
-    // Claude Vision Pflanzenerkennung
-    const base64 = addPhotoData.split(',')[1];
-    const mimeType = addPhotoData.split(';')[0].split(':')[1] || 'image/jpeg';
+    // Base64 → Blob
+    const mime = addPhotoData.split(';')[0].split(':')[1] || 'image/jpeg';
+    const blob = await fetch(addPhotoData).then(r => r.blob());
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 200,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
-            { type: 'text', text: 'Erkenne die Pflanze auf diesem Foto. Antworte NUR mit diesem JSON ohne Markdown: {"name":"Deutscher Name","latin":"Lateinischer Name","info":"Ein kurzer Satz"}' }
-          ]
-        }]
-      })
-    });
+    const fd = new FormData();
+    fd.append('images', blob, 'plant.jpg');
+
+    const PROXY = 'https://ormpszktwwiahjooukjk.supabase.co/functions/v1/plantnet-proxy';
+    const url = `${PROXY}?api-key=${encodeURIComponent(plantnetKey)}&nb-results=3&lang=de`;
+
+    const response = await fetch(url, { method: 'POST', body: fd });
     const data = await response.json();
 
-    if (!response.ok) throw new Error(data.error?.message || 'API-Fehler ' + response.status);
+    if (!response.ok) throw new Error(data.message || 'PlantNet Fehler ' + response.status);
 
-    let result;
-    try { result = JSON.parse(data.content[0].text); }
-    catch { throw new Error('Keine Pflanze erkannt. Versuche ein deutlicheres Foto.'); }
+    const results = data.results || [];
+    if (!results.length) throw new Error('Keine Pflanze erkannt. Versuche ein deutlicheres Foto.');
 
-    const germanName = result.name || 'Unbekannt';
-    const latinName = result.latin || '';
+    const best = results[0];
+    const germanName = best.species?.commonNames?.[0] || best.species?.scientificNameWithoutAuthor || 'Unbekannt';
+    const latinName = best.species?.scientificNameWithoutAuthor || '';
+    const pct = Math.round((best.score || 0) * 100);
+    const info = `PlantNet: ${pct}% Übereinstimmung` + (best.species?.family?.scientificNameWithoutAuthor ? ` · Familie: ${best.species.family.scientificNameWithoutAuthor}` : '');
 
     lastAiName = germanName;
-    // Namen direkt eintragen
     autoApplyAiName(germanName);
     document.getElementById('ai-name-text').textContent =
       germanName + (latinName && latinName !== germanName ? ` (${latinName})` : '');
-    document.getElementById('ai-info-text').textContent = result.info || '';
+    document.getElementById('ai-info-text').textContent = info;
     resultBox.style.display = 'block';
     document.getElementById('lens-link').style.display = 'inline-block';
 
@@ -1158,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 openDB().then(() => {
   updateDueBadge();
   updateKeyStatus();
+  updatePlantNetKeyStatus();
 }).catch(err => alert('IndexedDB Fehler: ' + err));
 async function loadAllInfos(forceReload=false) {
   const key = getApiKey();
