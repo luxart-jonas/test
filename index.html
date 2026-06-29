@@ -1079,15 +1079,7 @@ async function showInfoModal() {
         max_tokens: 1024,
         messages: [{
           role: 'user',
-          content: `Gib mir Informationen zur Pflanze "${p.name}"${p.latin ? ` (${p.latin})` : ''} auf Deutsch.
-
-**Bestimmungsmerkmale:**
-Beschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.
-
-**Fun Facts:**
-3 überraschende Fakten – historisch, kulinarisch, medizinisch oder ökologisch. Fließtext, ca. 3-4 Sätze.
-
-Kein Markdown außer den zwei Überschriften mit **.`
+          content: 'Gib mir Informationen zur Pflanze "' + p.name + '"' + (p.latin ? ' (' + p.latin + ')' : '') + ' auf Deutsch.\n\n**Bestimmungsmerkmale:**\nBeschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.\n\n**Fun Facts:**\n3 überraschende Fakten – historisch, kulinarisch, medizinisch oder ökologisch. Fließtext, ca. 3-4 Sätze.\n\nKein Markdown außer den zwei Überschriften mit **.'
         }]
       })
     });
@@ -1488,15 +1480,7 @@ async function loadAllInfos(forceReload=false) {
         headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6', max_tokens: 1024,
-          messages: [{ role: 'user', content: `Gib mir Informationen zur Pflanze "${p.name}"${p.latin ? \` (\${p.latin})\` : ''} auf Deutsch.
-
-**Bestimmungsmerkmale:**
-Beschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.
-
-**Fun Facts:**
-3 überraschende Fakten – historisch, kulinarisch, medizinisch oder ökologisch. Fließtext, ca. 3-4 Sätze.
-
-Kein Markdown außer den zwei Überschriften mit **.` }]
+          messages: [{ role: 'user', content: 'Gib mir Informationen zur Pflanze "' + p.name + '"' + (p.latin ? ' (' + p.latin + ')' : '') + ' auf Deutsch.\n\n**Bestimmungsmerkmale:**\nBeschreibe 4-5 typische Erkennungsmerkmale (Blätter, Blüten, Stängel, Wuchsform). Fließtext, ca. 3-4 Sätze.\n\n**Fun Facts:**\n3 überraschende Fakten – historisch, kulinarisch, medizinisch oder ökologisch. Fließtext, ca. 3-4 Sätze.\n\nKein Markdown außer den zwei Überschriften mit **.' }]
         })
       });
       const data = await res.json();
