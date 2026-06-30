@@ -425,7 +425,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.21 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.22 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -1138,6 +1138,7 @@ function infoReloadBtnHtml2(plantId) {
 }
 
 async function reloadInfoModal(plantId) {
+  plantId = Number(plantId);
   delete infoCache[plantId];
   document.getElementById('info-modal-content').innerHTML = '<div id="info-loading">🔍 Lade Informationen …</div>';
   const html = await generatePlantInfo(plantId);
