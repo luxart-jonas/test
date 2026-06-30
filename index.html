@@ -425,7 +425,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.19 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.20 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -1134,7 +1134,7 @@ async function showInfoModal() {
 }
 
 function infoReloadBtnHtml2(plantId) {
-  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="reloadInfoModal(\\'' + plantId + '\\')">🔄 Infos neu laden</button>';
+  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="reloadInfoModal(&quot;' + plantId + '&quot;)">🔄 Infos neu laden</button>';
 }
 
 async function reloadInfoModal(plantId) {
