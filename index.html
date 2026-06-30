@@ -425,7 +425,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.24 — Claude Vision + PlantNet + Groq</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.25 — Claude Vision + PlantNet + Groq</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Pflanzeninfos</div>
@@ -440,7 +440,7 @@
       <div class="form-group">
         <label>Anthropic API-Key</label>
         <div class="api-key-row">
-          <input type="password" id="api-key-input" placeholder="2b…" autocomplete="off" autocorrect="off" spellcheck="false">
+          <input type="text" id="api-key-input" placeholder="2b…" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="anthropic-key-field" style="-webkit-text-security:disc">
           <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Speichern</button>
         </div>
         <div id="key-status" class="key-none">Kein API-Key gespeichert</div>
@@ -459,7 +459,7 @@
       </p>
       <label>PlantNet API-Key</label>
       <div class="api-key-row">
-        <input type="password" id="plantnet-key-input" placeholder="2b10…" autocomplete="off" spellcheck="false">
+        <input type="text" id="plantnet-key-input" placeholder="2b10…" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="plantnet-key-field" style="-webkit-text-security:disc">
         <button class="btn btn-primary btn-sm" onclick="savePlantNetKey()">Speichern</button>
       </div>
       <div id="plantnet-key-status" class="key-none">Kein PlantNet API-Key gespeichert</div>
@@ -474,7 +474,7 @@
       </p>
       <label>Groq API-Key</label>
       <div class="api-key-row">
-        <input type="password" id="groq-key-input" placeholder="gsk_…" autocomplete="off" spellcheck="false">
+        <input type="text" id="groq-key-input" placeholder="gsk_…" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" name="groq-key-field" style="-webkit-text-security:disc">
         <button class="btn btn-primary btn-sm" onclick="saveGroqKey()">Speichern</button>
       </div>
       <div id="groq-key-status" class="key-none">Kein Groq API-Key gespeichert</div>
