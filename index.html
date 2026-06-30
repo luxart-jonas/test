@@ -425,7 +425,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.23 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.24 — Claude Vision + PlantNet + Groq</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Pflanzeninfos</div>
@@ -464,6 +464,21 @@
       </div>
       <div id="plantnet-key-status" class="key-none">Kein PlantNet API-Key gespeichert</div>
       <button class="btn btn-danger" style="margin-top:12px" onclick="deletePlantNetKey()">PlantNet Key löschen</button>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+
+      <h2 style="margin-bottom:6px">💬 Groq API-Key</h2>
+      <p class="settings-note" style="margin-bottom:12px">
+        Für die "Frage zur Pflanze"-Funktion (kostenlos, Llama 3.3 70B).<br>
+        Key unter <span style="color:var(--accent)">console.groq.com</span> registrieren — kein Kreditkarte nötig.
+      </p>
+      <label>Groq API-Key</label>
+      <div class="api-key-row">
+        <input type="password" id="groq-key-input" placeholder="gsk_…" autocomplete="off" spellcheck="false">
+        <button class="btn btn-primary btn-sm" onclick="saveGroqKey()">Speichern</button>
+      </div>
+      <div id="groq-key-status" class="key-none">Kein Groq API-Key gespeichert</div>
+      <button class="btn btn-danger" style="margin-top:12px" onclick="deleteGroqKey()">Groq Key löschen</button>
 
       <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
 
@@ -582,6 +597,31 @@ function computeNextReview(level) { return Date.now() + INTERVALS[Math.min(level
 // ── API Key (localStorage) ───────────────────────────────────
 function getApiKey() { return localStorage.getItem('ant_key') || ''; }
 function getPlantNetKey() { return localStorage.getItem('plantnet_key') || ''; }
+function getGroqKey() { return localStorage.getItem('groq_key') || ''; }
+function saveGroqKey() {
+  const val = document.getElementById('groq-key-input').value.trim();
+  if (!val) { alert('Bitte einen Groq API-Key eingeben.'); return; }
+  localStorage.setItem('groq_key', val);
+  document.getElementById('groq-key-input').value = '';
+  updateGroqKeyStatus();
+  alert('Groq API-Key gespeichert!');
+}
+function deleteGroqKey() {
+  if (!confirm('Groq API-Key wirklich löschen?')) return;
+  localStorage.removeItem('groq_key');
+  updateGroqKeyStatus();
+}
+function updateGroqKeyStatus() {
+  const el = document.getElementById('groq-key-status');
+  if (!el) return;
+  if (getGroqKey()) {
+    el.textContent = '✓ Groq API-Key gespeichert';
+    el.className = 'key-ok';
+  } else {
+    el.textContent = 'Kein Groq API-Key gespeichert';
+    el.className = 'key-none';
+  }
+}
 function savePlantNetKey() {
   const val = document.getElementById('plantnet-key-input').value.trim();
   if (!val) { alert('Bitte einen PlantNet API-Key eingeben.'); return; }
@@ -613,6 +653,7 @@ function saveApiKey() {
   document.getElementById('api-key-input').value = '';
   updateKeyStatus();
   updatePlantNetKeyStatus();
+  updateGroqKeyStatus();
   alert('Anthropic API-Key gespeichert!');
 }
 function deleteApiKey() {
@@ -620,6 +661,7 @@ function deleteApiKey() {
   localStorage.removeItem('ant_key');
   updateKeyStatus();
   updatePlantNetKeyStatus();
+  updateGroqKeyStatus();
 }
 function updateKeyStatus() {
   const el = document.getElementById('key-status');
@@ -649,6 +691,7 @@ function switchTab(tab) {
   if (tab === 'learn')   initLearn();
   if (tab === 'settings') updateKeyStatus();
   updatePlantNetKeyStatus();
+  updateGroqKeyStatus();
 }
 
 // ── Image Resize ─────────────────────────────────────────────
@@ -970,7 +1013,61 @@ async function loadModalInfo(forceReload = false) {
 }
 
 function infoReloadBtnHtml() {
-  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="loadModalInfo(true)">🔄 Infos neu laden</button>';
+  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="loadModalInfo(true)">🔄 Infos neu laden</button>'
+    + askQuestionBlockHtml('modal', currentDetailId);
+}
+
+// ── "Frage zur Pflanze" via Groq ──────────────────────────────
+function askQuestionBlockHtml(context, plantId) {
+  const boxId = context + '-ask-box';
+  return `
+    <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">💬 Frage zur Pflanze</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="${context}-ask-input" placeholder="z.B. Ist sie giftig für Hunde?" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:6px;font-size:.85rem;outline:none">
+        <button class="btn btn-primary btn-sm" onclick="askPlantQuestion('${context}', ${plantId})">Fragen</button>
+      </div>
+      <div id="${boxId}" style="margin-top:10px;font-size:.85rem;min-height:0"></div>
+    </div>`;
+}
+
+async function askPlantQuestion(context, plantId) {
+  const groqKey = getGroqKey();
+  if (!groqKey) { alert('Bitte zuerst einen Groq API-Key in den Einstellungen eintragen.'); return; }
+
+  const input = document.getElementById(context + '-ask-input');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const p = await dbGet(plantId);
+  if (!p) return;
+
+  const box = document.getElementById(context + '-ask-box');
+  box.innerHTML = '<div style="color:var(--muted)">🔍 Frage wird beantwortet …</div>';
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + groqKey
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 400,
+        messages: [{
+          role: 'user',
+          content: 'Du bist ein botanischer Experte. Beantworte folgende Frage zur Pflanze "' + p.name + '"' + (p.latin ? ' (' + p.latin + ')' : '') + ' auf Deutsch, kurz und präzise (max. 4-5 Sätze):\n\n' + question
+        }]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'Groq Fehler ' + res.status);
+    const answer = data.choices?.[0]?.message?.content || 'Keine Antwort erhalten.';
+    box.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;line-height:1.5">' + answer.replace(/\n/g, '<br>') + '</div>';
+  } catch(err) {
+    box.innerHTML = '<p style="color:var(--danger)">Fehler: ' + err.message + '</p>';
+  }
 }
 async function deletePlant(id) {
   if (!confirm('Diese Pflanze wirklich löschen?')) return;
@@ -1133,7 +1230,8 @@ async function showInfoModal() {
 }
 
 function infoReloadBtnHtml2(plantId) {
-  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="reloadInfoModal(&quot;' + plantId + '&quot;)">🔄 Infos neu laden</button>';
+  return '<button class="btn btn-secondary" style="margin-top:14px;width:100%;font-size:.85rem" onclick="reloadInfoModal(&quot;' + plantId + '&quot;)">🔄 Infos neu laden</button>'
+    + askQuestionBlockHtml('info', Number(plantId));
 }
 
 async function reloadInfoModal(plantId) {
@@ -1579,6 +1677,7 @@ openDB().then(() => {
   updateDueBadge();
   updateKeyStatus();
   updatePlantNetKeyStatus();
+  updateGroqKeyStatus();
 }).catch(err => alert('IndexedDB Fehler: ' + err));
 function confirmRegenAll() {
   if (!confirm('⚠️ Alle Infos neu generieren?\n\nDies überschreibt alle bereits generierten Bestimmungsmerkmale und Fun Facts für alle Pflanzen in deiner Sammlung. Dieser Vorgang kann mehrere Minuten dauern und kann nicht rückgängig gemacht werden.')) return;
