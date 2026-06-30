@@ -425,13 +425,12 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.22 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.23 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
-        <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
-        <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">Lädt Bestimmungsmerkmale und Fun Facts für alle Pflanzen ohne Info. Danach sofort abrufbar.</p>
-        <button class="btn btn-primary" onclick="loadAllInfos(false)" id="btn-load-all">Alle Infos laden</button>
-        <button class="btn btn-secondary" onclick="confirmRegenAll()" style="margin-top:8px;">🔄 Alle Infos neu generieren</button>
+        <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Pflanzeninfos</div>
+        <p style="font-size:.85rem;color:var(--muted);margin-bottom:12px;">Neue Pflanzen erhalten ihre Infos automatisch im Hintergrund. Mit diesem Button werden alle Infos für die gesamte Sammlung neu generiert.</p>
+        <button class="btn btn-secondary" onclick="confirmRegenAll()" id="btn-load-all">🔄 Alle Infos neu generieren</button>
         <div id="load-all-status" style="margin-top:10px;font-size:.85rem;color:var(--muted);"></div>
       </div>
       <p class="settings-note">
