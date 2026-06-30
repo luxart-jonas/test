@@ -425,7 +425,7 @@
     <!-- SETTINGS -->
     <div class="screen" id="settings-screen">
       <h2>⚙️ Einstellungen</h2>
-      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.20 — Claude Vision + PlantNet</p>
+      <p style="color:var(--muted);font-size:.8rem;margin-bottom:12px;">Version 3.21 — Claude Vision + PlantNet</p>
 
       <div class="card" style="margin-bottom:16px;">
         <div style="font-weight:600;color:var(--accent2);margin-bottom:8px;">🌿 Infos für alle Pflanzen laden</div>
@@ -1323,7 +1323,7 @@ function showIllusImage(context, url, label) {
   img.src = url;
   img.alt = 'Botanische Illustration';
   img.style.cursor = 'zoom-in';
-  img.onclick = () => openZoom(url);
+  img.onclick = () => openZoom(url, context);
   img.onerror = () => { boxEl.innerHTML = '<div class="illus-loading">Bild konnte nicht geladen werden</div>'; };
   boxEl.innerHTML = '';
   boxEl.appendChild(img);
@@ -1384,18 +1384,22 @@ async function illusDelete(context) {
 }
 
 // ── Zoom ──────────────────────────────────────────────────────
-// ── Zoom mit Pinch-to-Zoom ───────────────────────────────────
+// ── Zoom mit Pinch-to-Zoom + Vor/Zurück ──────────────────────
 let zoomScale = 1, zoomX = 0, zoomY = 0;
 let lastDist = 0, lastTouchX = 0, lastTouchY = 0, isDragging = false;
+let zoomDidPinchOrDrag = false;
+let zoomContext = null; // 'modal' oder 'info' — welcher Illustration-State gerade gezeigt wird
 
-function openZoom(url) {
+function openZoom(url, context) {
   const img = document.getElementById('zoom-img');
   const overlay = document.getElementById('zoom-overlay');
   img.src = url;
   zoomScale = 1; zoomX = 0; zoomY = 0;
+  zoomContext = context || null;
   applyZoomTransform();
   overlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  updateZoomNavVisibility();
 }
 
 function closeZoom() {
@@ -1403,6 +1407,7 @@ function closeZoom() {
   document.getElementById('zoom-img').src = '';
   document.body.style.overflow = '';
   zoomScale = 1; zoomX = 0; zoomY = 0;
+  zoomContext = null;
 }
 
 function applyZoomTransform() {
@@ -1410,7 +1415,40 @@ function applyZoomTransform() {
   img.style.transform = `scale(${zoomScale}) translate(${zoomX}px, ${zoomY}px)`;
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeZoom(); });
+function updateZoomNavVisibility() {
+  const nav = document.getElementById('zoom-nav');
+  if (!nav) return;
+  const hasMultiple = zoomContext && illusState[zoomContext] && illusState[zoomContext].files && illusState[zoomContext].files.length > 1 && !illusState[zoomContext].customUrl;
+  nav.style.display = hasMultiple ? 'flex' : 'none';
+}
+
+async function zoomNavNext() {
+  if (!zoomContext) return;
+  await illusNext(zoomContext);
+  // Neues Bild ins Zoom-Overlay übernehmen
+  const boxImg = document.querySelector('#' + zoomContext + '-illus-box img');
+  if (boxImg) {
+    zoomScale = 1; zoomX = 0; zoomY = 0;
+    applyZoomTransform();
+    document.getElementById('zoom-img').src = boxImg.src;
+  }
+}
+async function zoomNavPrev() {
+  if (!zoomContext) return;
+  await illusPrev(zoomContext);
+  const boxImg = document.querySelector('#' + zoomContext + '-illus-box img');
+  if (boxImg) {
+    zoomScale = 1; zoomX = 0; zoomY = 0;
+    applyZoomTransform();
+    document.getElementById('zoom-img').src = boxImg.src;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeZoom();
+  if (e.key === 'ArrowRight') zoomNavNext();
+  if (e.key === 'ArrowLeft') zoomNavPrev();
+});
 
 // Zoom Touch/Click Events — nach DOM-Laden
 document.addEventListener('DOMContentLoaded', () => {
@@ -1425,6 +1463,7 @@ const zoomImg = document.getElementById('zoom-img');
 
 zoomImg.addEventListener('touchstart', e => {
   e.preventDefault();
+  zoomDidPinchOrDrag = false;
   if (e.touches.length === 2) {
     lastDist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -1439,6 +1478,7 @@ zoomImg.addEventListener('touchstart', e => {
 
 zoomImg.addEventListener('touchmove', e => {
   e.preventDefault();
+  zoomDidPinchOrDrag = true;
   if (e.touches.length === 2) {
     const dist = Math.hypot(
       e.touches[0].clientX - e.touches[1].clientX,
@@ -1460,8 +1500,14 @@ zoomImg.addEventListener('touchmove', e => {
 
 zoomImg.addEventListener('touchend', e => {
   isDragging = false;
-  // Doppeltippen: reset
-  if (e.changedTouches.length === 1 && zoomScale === 1) closeZoom();
+  // Einzeltipp ohne Pinch/Drag → schließen, egal welcher Zoomlevel
+  if (!zoomDidPinchOrDrag && e.changedTouches.length === 1) closeZoom();
+});
+
+// Einzelklick (Desktop/Maus) auf Bild → schließen
+zoomImg.addEventListener('click', e => {
+  e.stopPropagation();
+  closeZoom();
 });
 
 // Maus-Scroll zum Zoomen (Desktop)
@@ -1625,11 +1671,31 @@ async function loadAllInfos(forceReload=false) {
   btn.disabled = false;
 }
 
+
+// ── Beim Start: fehlende Infos still im Hintergrund nachladen ──
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(async () => {
+    if (!getApiKey()) return;
+    try {
+      const all = await dbGetAll();
+      const missing = all.filter(p => !p.infoHtml && p.name);
+      for (const p of missing) {
+        await generatePlantInfo(p.id);
+        await new Promise(r => setTimeout(r, 800));
+      }
+    } catch {}
+  }, 2000); // kurze Verzögerung, App soll erst geladen sein
+});
+
 if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(r => r.forEach(s => s.unregister())); }
 </script>
 <!-- Zoom Overlay -->
 <div id="zoom-overlay">
   <button class="close-btn" onclick="closeZoom()">✕</button>
+  <div id="zoom-nav" style="display:none;position:absolute;inset:0;align-items:center;justify-content:space-between;padding:0 8px;pointer-events:none;z-index:1;">
+    <button onclick="event.stopPropagation();zoomNavPrev()" style="pointer-events:auto;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:1.4rem;width:42px;height:42px;border-radius:50%;cursor:pointer;">‹</button>
+    <button onclick="event.stopPropagation();zoomNavNext()" style="pointer-events:auto;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:1.4rem;width:42px;height:42px;border-radius:50%;cursor:pointer;">›</button>
+  </div>
   <div id="zoom-img-wrap" style="overflow:hidden;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">
     <img id="zoom-img" src="" alt="">
   </div>
